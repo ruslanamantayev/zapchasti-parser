@@ -17,28 +17,32 @@ from src.utils.logging import setup_logging
 from src.scheduler.manager import SchedulerManager
 
 
-def main():
+async def run():
     setup_logging()
 
     manager = SchedulerManager()
     manager.start()
 
-    # Handle graceful shutdown
-    loop = asyncio.get_event_loop()
+    print("Continuous mode started. Waiting for scheduled jobs...")
 
-    def shutdown(sig):
-        print(f"\nReceived {sig.name}, shutting down...")
-        manager.stop()
-        loop.stop()
+    # Wait forever, handle shutdown via signal
+    stop_event = asyncio.Event()
 
+    loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, shutdown, sig)
+        loop.add_signal_handler(sig, stop_event.set)
 
-    print("Continuous mode started. Press Ctrl+C to stop.")
+    await stop_event.wait()
+
+    print("Shutting down...")
+    manager.stop()
+
+
+def main():
     try:
-        loop.run_forever()
-    finally:
-        loop.close()
+        asyncio.run(run())
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
