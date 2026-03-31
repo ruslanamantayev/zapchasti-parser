@@ -1,0 +1,43 @@
+# Data source configuration for continuous mode
+# schedule: cron expression (APScheduler format)
+# enabled: whether to run in continuous mode
+# collector: Python class path
+
+sources:
+  dgis_suppliers:
+    collector: src.collectors.suppliers.dgis.DgisSupplierCollector
+    schedule: "0 0 */3 * *"  # Every 3 days
+    enabled: true
+    description: "2GIS supplier directory (92 cities)"
+
+  hespareparts:
+    collector: src.collectors.parts.hespareparts.HesparepartsCollector
+    schedule: "0 0 * * 0"  # Weekly on Sunday
+    enabled: true
+    description: "HeSpareParts aftermarket catalog (15 brands)"
+
+  exkavator:
+    collector: src.collectors.suppliers.exkavator.ExkavatorCollector
+    schedule: "0 0 */7 * *"  # Weekly
+    enabled: true
+    description: "Exkavator.ru ads + companies (156 subcategories)"
+
+  # === Planned sources (enable as collectors are implemented) ===
+
+  # orgpage:
+  #   collector: src.collectors.suppliers.orgpage.OrgPageCollector
+  #   schedule: "0 0 */7 * *"
+  #   enabled: false
+  #   description: "OrgPage.ru company directory"
+
+  # autoopt:
+  #   collector: src.collectors.parts.autoopt.AutooptCollector
+  #   schedule: "0 0 */14 * *"
+  #   enabled: false
+  #   description: "AutoOpt.ru parts catalog (KAMAZ, BELAZ, MTZ)"
+
+  # agroserver:
+  #   collector: src.collectors.suppliers.agroserver.AgroserverCollector
+  #   schedule: "0 0 */7 * *"
+  #   enabled: false
+  #   description: "Agroserver.ru agricultural equipment"
