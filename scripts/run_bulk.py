@@ -22,10 +22,12 @@ from src.config.database import engine
 # === Collector Registry ===
 from src.collectors.suppliers.dgis import DgisSupplierCollector
 from src.collectors.parts.hespareparts import HesparepartsCollector
+from src.collectors.suppliers.exkavator import ExkavatorCollector
 
 COLLECTORS = {
     "dgis_suppliers": DgisSupplierCollector,
     "hespareparts": HesparepartsCollector,
+    "exkavator": ExkavatorCollector,
 }
 
 
