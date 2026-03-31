@@ -1,0 +1,22 @@
+services:
+  parser:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: zapchasti-parser
+    env_file:
+      - ../.env
+    volumes:
+      - ../data:/app/data
+    networks:
+      - shared-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    restart: unless-stopped
+
+networks:
+  shared-network:
+    external: true
