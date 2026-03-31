@@ -57,8 +57,8 @@ class Supplier(Base):
     response_type = Column(String)
     notes = Column(Text)
 
-    # Platform link
-    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
+    # Platform link (no FK here — companies table managed by platform)
+    company_id = Column(Integer, nullable=True)
     has_pricelist = Column(Boolean, default=False)
     pricelist_updated_at = Column(DateTime)
 
@@ -94,7 +94,7 @@ class SupplierBrand(Base):
 
     id = Column(Integer, primary_key=True)
     supplier_id = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False)
-    brand_id = Column(Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    brand_id = Column(Integer, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("supplier_id", "brand_id"),
@@ -107,7 +107,7 @@ class SupplierEquipmentType(Base):
 
     id = Column(Integer, primary_key=True)
     supplier_id = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False)
-    equipment_type_id = Column(Integer, ForeignKey("equipment_types.id", ondelete="CASCADE"), nullable=False)
+    equipment_type_id = Column(Integer, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("supplier_id", "equipment_type_id"),
@@ -120,7 +120,7 @@ class SupplierPartCategory(Base):
 
     id = Column(Integer, primary_key=True)
     supplier_id = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False)
-    part_category_id = Column(Integer, ForeignKey("part_categories.id", ondelete="CASCADE"), nullable=False)
+    part_category_id = Column(Integer, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("supplier_id", "part_category_id"),

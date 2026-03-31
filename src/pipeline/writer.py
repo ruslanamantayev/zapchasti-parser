@@ -99,11 +99,15 @@ class SupplierWriter:
                 result.created += 1
 
             except Exception as e:
+                self.db.rollback()
                 result.errors += 1
                 result.details.append(f"{item.get('name', '?')}: {e}")
                 logger.warning(f"Import error: {e}")
 
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
         return result
 
     def _update_existing(self, existing: Supplier, item: dict,
