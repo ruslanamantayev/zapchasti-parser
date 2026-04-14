@@ -1,14 +1,10 @@
 """
 Exkavator.ru collector — ads + company contacts from exkavator.ru.
-10,399 ads in 156 subcategories.
-Migrated from zapchasti-platform/backend/app/parsers/sources/exkavator.py
+10,399 ads in 156 subcategories. 202 companies in catalog.
 
-Strategy:
-1. Get subcategories from /trade/parts/search/
-2. For each subcategory — get ad IDs
-3. For each ad — extract JSON-LD (article, brand, price, description, images)
-4. For each unique company — parse contacts from company page
-5. Save companies → suppliers table, ads → data/raw/
+Two modes:
+- collect_bulk: parse ads → extract companies from ad pages
+- collect_companies_catalog: parse /trade/companies/ directory (faster, more complete)
 """
 import json
 import logging
@@ -134,7 +130,7 @@ class ExkavatorCollector(BaseCollector):
         }
 
     async def get_company_contacts(self, company_url: str) -> dict:
-        """Parse company contacts from profile page"""
+        """Parse company contacts + brands + description from profile page"""
         html = await self.http.get_text(f"{BASE_URL}{company_url}")
 
         phones = re.findall(r'\+7\s*\(\d{3}\)\s*\d{3}[\-\s]\d{2}[\-\s]\d{2}', html)
@@ -151,12 +147,53 @@ class ExkavatorCollector(BaseCollector):
         if h1:
             name = re.sub(r'<[^>]+>', '', h1[0]).strip().replace("Компания ", "")
 
+        # Brands: <div class="tit">Марки</div> <div class="txt">BRAND1, BRAND2...</div>
+        brands = []
+        brands_match = re.search(
+            r'<div class="tit">Марки</div>\s*<div class="txt">([\s\S]*?)</div>',
+            html,
+        )
+        if brands_match:
+            brands_text = re.sub(r'<[^>]+>', '', brands_match.group(1))
+            brands_text = re.sub(r'\s+', ' ', brands_text).strip()
+            brands = [b.strip() for b in brands_text.split(',') if b.strip()]
+
+        # Description: first <p> inside company description block
+        description = None
+        desc_match = re.search(
+            r'<div[^>]*class="[^"]*company[^"]*desc[^"]*"[^>]*>\s*<p>([\s\S]*?)</p>',
+            html,
+        )
+        if not desc_match:
+            # Fallback: any substantial <p> after h1
+            h1_idx = html.find('</h1>')
+            if h1_idx > 0:
+                paragraphs = re.findall(r'<p>([\s\S]*?)</p>', html[h1_idx:h1_idx + 5000])
+                for p in paragraphs:
+                    text = re.sub(r'<[^>]+>', '', p).strip()
+                    if len(text) > 50 and 'exkavator' not in text.lower():
+                        description = text
+                        break
+        else:
+            description = re.sub(r'<[^>]+>', '', desc_match.group(1)).strip()
+
+        # Specializations from spec-list
+        specializations = re.findall(r'<div class="spec">([^<]+)</div>', html)
+
+        # Websites
+        websites = re.findall(r'href="(https?://[^"]+)"[^>]*target="_blank"', html)
+        websites = [w for w in websites if 'exkavator.ru' not in w]
+
         return {
             "name": name,
             "phone": phones[0] if phones else None,
             "email": emails[0] if emails else None,
             "city": city,
             "source_url": f"{BASE_URL}{company_url}",
+            "brands": brands,
+            "description": description,
+            "specializations": specializations,
+            "websites": websites,
         }
 
     async def collect_bulk(self, max_categories: int = 0, max_ads_per_cat: int = 0, **kwargs) -> CollectorStats:
@@ -232,6 +269,114 @@ class ExkavatorCollector(BaseCollector):
         logger.info(
             f"exkavator done: {stats.total_found} ads, "
             f"{stats.created} suppliers created, {len(self._parsed_companies)} companies parsed"
+        )
+        return stats
+
+    async def collect_companies_catalog(self, max_pages: int = 0, **kwargs) -> CollectorStats:
+        """
+        Parse companies from /trade/companies/find/category/zapchasti/
+        202 companies across 9 pages. Much faster than parsing from ads.
+        """
+        stats = CollectorStats(collector_name="exkavator_companies")
+        db = SessionLocal()
+        writer = SupplierWriter(db)
+
+        try:
+            # Discover total pages
+            first_url = f"{BASE_URL}/trade/companies/find/category/zapchasti/"
+            html = await self.http.get_text(first_url)
+
+            # Find page offsets: /pages/25/, /pages/50/, ...
+            page_offsets = [0]  # first page
+            offsets_found = re.findall(r'/pages/(\d+)/', html)
+            for o in sorted(set(int(x) for x in offsets_found)):
+                if o not in page_offsets:
+                    page_offsets.append(o)
+
+            if max_pages > 0:
+                page_offsets = page_offsets[:max_pages]
+
+            logger.info(f"Companies catalog: {len(page_offsets)} pages to parse")
+
+            for page_idx, offset in enumerate(page_offsets):
+                if offset == 0:
+                    page_html = html  # already fetched
+                else:
+                    page_url = f"{BASE_URL}/trade/companies/find/category/zapchasti/pages/{offset}/"
+                    page_html = await self.http.get_text(page_url)
+
+                # Structure: <a class="link" href="/trade/company/slug/">
+                #   <span class="title">Name</span>
+                # Before the <a>: <div class="site-url"...><a href="http://site.ru">
+                company_blocks = re.findall(
+                    r'(?:<div class="site-url"[^>]*>\s*<a href="(https?://[^"]+)"[^>]*>[^<]*</a></div>)?'
+                    r'[\s\S]{0,300}?'
+                    r'<a class="link" href="(/trade/company/[^"]+/)">'
+                    r'[\s\S]*?<span class="title">([^<]+)</span>',
+                    page_html,
+                )
+
+                # Deduplicate
+                seen_urls = set()
+                companies_on_page = []
+                for website, href, name in company_blocks:
+                    name = name.strip()
+                    if href in seen_urls or not name:
+                        continue
+                    seen_urls.add(href)
+                    companies_on_page.append({
+                        "url": href,
+                        "name": name,
+                        "website": website if website and "exkavator" not in website else None,
+                    })
+
+                logger.info(f"  Page {page_idx + 1}/{len(page_offsets)}: {len(companies_on_page)} companies")
+
+                for company in companies_on_page:
+                    company_url = company["url"]
+                    if company_url in self._parsed_companies:
+                        stats.skipped += 1
+                        continue
+                    self._parsed_companies.add(company_url)
+
+                    try:
+                        contacts = await self.get_company_contacts(company_url)
+                        stats.total_found += 1
+
+                        supplier_data = {
+                            "name": contacts.get("name") or company["name"],
+                            "phone": contacts.get("phone"),
+                            "email": contacts.get("email"),
+                            "city": contacts.get("city"),
+                            "website": contacts.get("websites", [None])[0] or company.get("website"),
+                            "source": "exkavator",
+                            "source_url": contacts.get("source_url"),
+                            "source_id": company_url.rstrip("/").split("/")[-1],
+                            "raw_data": {
+                                "brands": contacts.get("brands", []),
+                                "description": contacts.get("description"),
+                                "specializations": contacts.get("specializations", []),
+                                "websites": contacts.get("websites", []),
+                            },
+                        }
+
+                        if supplier_data["name"]:
+                            result = writer.batch_import([supplier_data])
+                            stats.created += result.created
+                            stats.updated += result.updated
+                            stats.skipped += result.skipped
+
+                    except Exception as e:
+                        logger.warning(f"Error parsing company {company_url}: {e}")
+                        stats.errors += 1
+
+        finally:
+            db.close()
+
+        stats.finished_at = datetime.utcnow()
+        logger.info(
+            f"exkavator companies catalog done: {stats.total_found} found, "
+            f"{stats.created} created, {stats.updated} updated, {stats.skipped} skipped"
         )
         return stats
 

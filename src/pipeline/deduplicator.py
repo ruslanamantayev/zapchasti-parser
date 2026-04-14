@@ -15,7 +15,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from src.models.supplier import Supplier
+from src.models.supplier import ParsedSupplier as Supplier
 from src.pipeline.normalizer import (
     normalize_phone, normalize_email, normalize_website,
     normalize_name, extract_domain,

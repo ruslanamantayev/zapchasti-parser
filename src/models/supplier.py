@@ -1,6 +1,11 @@
 """
-Supplier model — maps to the same 'suppliers' table used by zapchasti-platform.
-This is a read/write mapping, not a copy. Both platform and parser share one DB.
+ParsedSupplier — спарсенные поставщики (сырая база для аутрича).
+
+ВАЖНО: это НЕ зарегистрированные пользователи платформы.
+- parsed_suppliers = спарсенные из 2ГИС, Авито, каталогов — кандидаты на привлечение
+- companies (в platform) = зарегистрированные на платформе, есть кабинет
+
+Воронка: new → contacted → responded → registered (→ company_id)
 """
 import uuid
 from sqlalchemy import (
@@ -14,8 +19,8 @@ from sqlalchemy.sql import func
 from src.config.database import Base
 
 
-class Supplier(Base):
-    __tablename__ = "suppliers"
+class ParsedSupplier(Base):
+    __tablename__ = "parsed_suppliers"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -23,8 +28,8 @@ class Supplier(Base):
     name = Column(String, nullable=False)
     slug = Column(String, unique=True, index=True)
     inn = Column(String, unique=True, nullable=True)
-    supplier_type = Column(String)
-    legal_form = Column(String)
+    supplier_type = Column(String)       # dealer/dismantler/manufacturer/warehouse/individual
+    legal_form = Column(String)          # ООО/ИП/физлицо
 
     # Contacts
     phone = Column(String)
@@ -43,21 +48,22 @@ class Supplier(Base):
     address = Column(String)
 
     # Source tracking
-    source = Column(String)
+    source = Column(String)              # 2gis/avito/exkavator/pulscen/...
     source_url = Column(String)
     source_id = Column(String)
     raw_data = Column(JSONB, default=dict)
 
     # CRM / Outreach
     status = Column(String, default="new")
-    outreach_channel = Column(String)
+    # new → enriched → outreach_queued → contacted → responded → registered → rejected
+    outreach_channel = Column(String)    # email/telegram/whatsapp/phone
     outreach_count = Column(Integer, default=0)
     last_outreach_at = Column(DateTime)
     last_response_at = Column(DateTime)
-    response_type = Column(String)
+    response_type = Column(String)       # interested/not_interested/pricelist_sent/...
     notes = Column(Text)
 
-    # Platform link (no FK here — companies table managed by platform)
+    # Platform link — заполняется когда поставщик регистрируется на платформе
     company_id = Column(Integer, nullable=True)
     has_pricelist = Column(Boolean, default=False)
     pricelist_updated_at = Column(DateTime)
@@ -73,14 +79,14 @@ class Supplier(Base):
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     is_duplicate = Column(Boolean, default=False)
-    duplicate_of = Column(UUID(as_uuid=True), ForeignKey("suppliers.id"), nullable=True)
+    duplicate_of = Column(UUID(as_uuid=True), ForeignKey("parsed_suppliers.id"), nullable=True)
 
     __table_args__ = (
-        Index("idx_suppliers_status", "status"),
-        Index("idx_suppliers_city", "city"),
-        Index("idx_suppliers_source", "source"),
+        Index("idx_ps_status", "status"),
+        Index("idx_ps_city", "city"),
+        Index("idx_ps_source", "source"),
         Index(
-            "idx_suppliers_source_dedup",
+            "idx_ps_source_dedup",
             "source", "source_id",
             unique=True,
             postgresql_where=(source_id != None),  # noqa: E711
@@ -89,11 +95,11 @@ class Supplier(Base):
     )
 
 
-class SupplierBrand(Base):
-    __tablename__ = "supplier_brands"
+class ParsedSupplierBrand(Base):
+    __tablename__ = "parsed_supplier_brands"
 
     id = Column(Integer, primary_key=True)
-    supplier_id = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False)
+    supplier_id = Column(UUID(as_uuid=True), ForeignKey("parsed_suppliers.id", ondelete="CASCADE"), nullable=False)
     brand_id = Column(Integer, nullable=False)
 
     __table_args__ = (
@@ -102,11 +108,11 @@ class SupplierBrand(Base):
     )
 
 
-class SupplierEquipmentType(Base):
-    __tablename__ = "supplier_equipment_types"
+class ParsedSupplierEquipmentType(Base):
+    __tablename__ = "parsed_supplier_equipment_types"
 
     id = Column(Integer, primary_key=True)
-    supplier_id = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False)
+    supplier_id = Column(UUID(as_uuid=True), ForeignKey("parsed_suppliers.id", ondelete="CASCADE"), nullable=False)
     equipment_type_id = Column(Integer, nullable=False)
 
     __table_args__ = (
@@ -115,11 +121,11 @@ class SupplierEquipmentType(Base):
     )
 
 
-class SupplierPartCategory(Base):
-    __tablename__ = "supplier_part_categories"
+class ParsedSupplierPartCategory(Base):
+    __tablename__ = "parsed_supplier_part_categories"
 
     id = Column(Integer, primary_key=True)
-    supplier_id = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False)
+    supplier_id = Column(UUID(as_uuid=True), ForeignKey("parsed_suppliers.id", ondelete="CASCADE"), nullable=False)
     part_category_id = Column(Integer, nullable=False)
 
     __table_args__ = (

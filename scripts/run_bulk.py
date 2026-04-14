@@ -49,15 +49,39 @@ async def run_collector(name: str, args):
     collector = collector_cls()
 
     kwargs = {}
+    # dgis args
     if hasattr(args, "city") and args.city:
         kwargs["city"] = args.city
     if hasattr(args, "cities") and args.cities:
         kwargs["cities"] = [c.strip() for c in args.cities.split(",")]
     if hasattr(args, "all_cities") and args.all_cities:
         pass  # default behavior — all cities
+    # hespareparts args
+    if hasattr(args, "brand") and args.brand:
+        kwargs["brand"] = args.brand
+    if hasattr(args, "pages") and args.pages:
+        kwargs["max_pages"] = args.pages
+    if hasattr(args, "no_resume") and args.no_resume:
+        kwargs["resume"] = False
+    # exkavator args
+    if hasattr(args, "max_categories") and args.max_categories:
+        kwargs["max_categories"] = args.max_categories
+    if hasattr(args, "max_ads") and args.max_ads:
+        kwargs["max_ads_per_cat"] = args.max_ads
+
+    # exkavator_companies — special mode: use collect_companies_catalog
+    use_companies_catalog = (
+        name == "exkavator" and hasattr(args, "companies") and args.companies
+    )
 
     try:
-        stats = await collector.collect_bulk(**kwargs)
+        if use_companies_catalog:
+            cat_kwargs = {}
+            if hasattr(args, "pages") and args.pages:
+                cat_kwargs["max_pages"] = args.pages
+            stats = await collector.collect_companies_catalog(**cat_kwargs)
+        else:
+            stats = await collector.collect_bulk(**kwargs)
         print(f"\n{'='*50}")
         print(f"Collector: {stats.collector_name}")
         print(f"Found: {stats.total_found}")
@@ -104,6 +128,42 @@ def main():
         dest="all_cities",
         action="store_true",
         help="Parse all cities",
+    )
+
+    # HeSpareParts-specific args
+    parser.add_argument(
+        "--brand",
+        help="Brand to parse (hespareparts: caterpillar, komatsu, etc.)",
+    )
+    parser.add_argument(
+        "--pages",
+        type=int,
+        default=0,
+        help="Max pages per brand (0 = all)",
+    )
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Don't resume from progress file",
+    )
+
+    # Exkavator-specific args
+    parser.add_argument(
+        "--max-categories",
+        type=int,
+        default=0,
+        help="Max categories to parse (exkavator, 0 = all)",
+    )
+    parser.add_argument(
+        "--max-ads",
+        type=int,
+        default=0,
+        help="Max ads per category (exkavator, 0 = all)",
+    )
+    parser.add_argument(
+        "--companies",
+        action="store_true",
+        help="Parse companies catalog instead of ads (exkavator)",
     )
 
     args = parser.parse_args()

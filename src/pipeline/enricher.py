@@ -9,7 +9,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from src.models.supplier import Supplier
+from src.models.supplier import ParsedSupplier as Supplier
 from src.pipeline.normalizer import normalize_phone, normalize_email, normalize_website, extract_domain
 
 logger = logging.getLogger(__name__)

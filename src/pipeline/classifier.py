@@ -8,7 +8,12 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from src.models.supplier import Supplier, SupplierBrand, SupplierEquipmentType, SupplierPartCategory
+from src.models.supplier import (
+    ParsedSupplier as Supplier,
+    ParsedSupplierBrand as SupplierBrand,
+    ParsedSupplierEquipmentType as SupplierEquipmentType,
+    ParsedSupplierPartCategory as SupplierPartCategory,
+)
 
 logger = logging.getLogger(__name__)
 

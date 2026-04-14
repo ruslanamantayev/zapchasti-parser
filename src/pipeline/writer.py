@@ -7,7 +7,12 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from src.models.supplier import Supplier, SupplierBrand, SupplierEquipmentType, SupplierPartCategory
+from src.models.supplier import (
+    ParsedSupplier as Supplier,
+    ParsedSupplierBrand as SupplierBrand,
+    ParsedSupplierEquipmentType as SupplierEquipmentType,
+    ParsedSupplierPartCategory as SupplierPartCategory,
+)
 from src.pipeline.normalizer import (
     normalize_phone, normalize_email, normalize_website,
     normalize_name, extract_domain, slugify,
@@ -131,8 +136,19 @@ class SupplierWriter:
             existing.reviews_count = item["reviews_count"]
             updated = True
         if item.get("raw_data"):
-            existing.raw_data = item["raw_data"]
-            updated = True
+            new_raw = item["raw_data"]
+            # Merge: keep existing data, add new non-empty fields
+            if existing.raw_data and isinstance(existing.raw_data, dict):
+                merged = dict(existing.raw_data)
+                for k, v in new_raw.items():
+                    if v and v != [] and v != {}:
+                        merged[k] = v
+                if merged != existing.raw_data:
+                    existing.raw_data = merged
+                    updated = True
+            elif any(v for v in new_raw.values() if v and v != [] and v != {}):
+                existing.raw_data = new_raw
+                updated = True
         return updated
 
     def _find_duplicate(
