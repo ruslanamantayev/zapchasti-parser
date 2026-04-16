@@ -7,6 +7,7 @@ from .models import SearchRequest, SearchQuery, SearchDepth
 logger = logging.getLogger(__name__)
 
 DEPTH_LIMITS = {
+    SearchDepth.MINIMAL: 1,
     SearchDepth.QUICK: 5,
     SearchDepth.NORMAL: 15,
     SearchDepth.DEEP: 25,

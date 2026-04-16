@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class SearchDepth(str, Enum):
+    MINIMAL = "minimal"
     QUICK = "quick"
     NORMAL = "normal"
     DEEP = "deep"
@@ -19,7 +20,7 @@ class SearchRequest(BaseModel):
     equipment_brand: str = ""
     equipment_model: str = ""
     equipment_type: str = ""
-    depth: SearchDepth = SearchDepth.NORMAL
+    depth: SearchDepth = SearchDepth.MINIMAL
     languages: list[str] = Field(default_factory=lambda: ["ru", "en"])
     include_analogs: bool = True
     include_services: bool = False

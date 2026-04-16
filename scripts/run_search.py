@@ -96,9 +96,9 @@ def main():
     parser.add_argument("--equipment-type", help="Equipment type (e.g. drilling rig, excavator)")
     parser.add_argument(
         "--depth",
-        choices=["quick", "normal", "deep"],
-        default="normal",
-        help="Search depth: quick (5 queries), normal (15), deep (25+)",
+        choices=["minimal", "quick", "normal", "deep"],
+        default="minimal",
+        help="Search depth: minimal (1 query), quick (5), normal (15), deep (25)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Only generate queries, don't search")
     parser.add_argument("--position-id", type=int, help="CRM position ID to link offers")
