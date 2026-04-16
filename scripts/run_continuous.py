@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.utils.logging import setup_logging
 from src.scheduler.manager import SchedulerManager
+from src.collectors.search.task_worker import SearchTaskWorker
 
 
 async def run():
@@ -23,7 +24,10 @@ async def run():
     manager = SchedulerManager()
     manager.start()
 
-    print("Continuous mode started. Waiting for scheduled jobs...")
+    worker = SearchTaskWorker()
+    worker_task = asyncio.create_task(worker.run())
+
+    print("Continuous mode started. Scheduler + SearchTaskWorker running...")
 
     # Wait forever, handle shutdown via signal
     stop_event = asyncio.Event()
@@ -35,6 +39,11 @@ async def run():
     await stop_event.wait()
 
     print("Shutting down...")
+    worker.stop()
+    try:
+        await asyncio.wait_for(worker_task, timeout=5)
+    except asyncio.TimeoutError:
+        worker_task.cancel()
     manager.stop()
 
 

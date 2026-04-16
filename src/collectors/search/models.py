@@ -26,6 +26,7 @@ class SearchRequest(BaseModel):
     # Link back to CRM
     position_id: Optional[int] = None
     request_id: Optional[int] = None
+    task_id: Optional[int] = None      # crm.search_tasks.id
 
 
 class SearchQuery(BaseModel):
@@ -97,5 +98,5 @@ class SearchStats(BaseModel):
     results_after_dedup: int = 0
     suppliers_created: int = 0
     suppliers_updated: int = 0
-    offers_created: int = 0
+    results_linked: int = 0
     errors: list[str] = Field(default_factory=list)

@@ -69,7 +69,7 @@ async def run_search(args):
             print(f"  After dedup:        {stats.results_after_dedup}")
             print(f"  Suppliers created:  {stats.suppliers_created}")
             print(f"  Suppliers updated:  {stats.suppliers_updated}")
-            print(f"  Offers created:     {stats.offers_created}")
+            print(f"  Results linked:     {stats.results_linked}")
 
         if stats.errors:
             print(f"  Errors:             {len(stats.errors)}")

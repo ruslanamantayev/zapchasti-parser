@@ -140,6 +140,7 @@ class SearchEngine:
                     return writer.write(
                         ranked,
                         position_id=request.position_id,
+                        task_id=request.task_id,
                         article=request.article,
                     )
                 finally:
@@ -149,7 +150,7 @@ class SearchEngine:
             write_stats = await loop.run_in_executor(None, _write_to_db)
             stats.suppliers_created = write_stats["suppliers_created"]
             stats.suppliers_updated = write_stats["suppliers_updated"]
-            stats.offers_created = write_stats["offers_created"]
+            stats.results_linked = write_stats.get("results_linked", 0)
 
         return stats
 
